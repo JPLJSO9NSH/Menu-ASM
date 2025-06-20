@@ -1,11 +1,12 @@
 -- Arthur S. M. - Universal Script
--- Discord: (adicione seu contato aqui se quiser)
+-- Script com ESP (Nome + Vida), Aimbot, Fly com controle de velocidade, e NoClip.
+-- Botão personalizado para abrir/fechar o menu.
 
 -- 🧠 UI Library
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
 local Window = Library.CreateLib("Arthur S. M.", "Ocean")
 
--- ⚙️ Variáveis Gerais
+-- ⚙️ Variáveis
 local FlySpeed = 50
 local Flying = false
 local NoClip = false
@@ -13,9 +14,9 @@ local AimbotEnabled = false
 local AimPart = "Head"
 
 -------------------------------
--- 📦 Main Tab
+-- 📦 Menu Principal
 local Main = Window:NewTab("Main")
-local MainSection = Main:NewSection("Principal")
+local MainSection = Main:NewSection("Funções Principais")
 
 -- ✈️ Fly
 MainSection:NewToggle("Fly", "Ativar Fly", function(state)
@@ -26,7 +27,7 @@ MainSection:NewToggle("Fly", "Ativar Fly", function(state)
     end
 end)
 
-MainSection:NewSlider("Velocidade Fly", "Ajustar velocidade", 300, 10, function(s)
+MainSection:NewSlider("Velocidade Fly", "Ajuste a velocidade", 300, 10, function(s)
     FlySpeed = s
 end)
 
@@ -45,11 +46,11 @@ MainSection:NewToggle("NoClip", "Atravessar paredes", function(state)
 end)
 
 -------------------------------
--- 🎯 Aimbot Tab
+-- 🎯 Aimbot
 local AimTab = Window:NewTab("Aimbot")
 local AimSection = AimTab:NewSection("Aimbot")
 
-AimSection:NewToggle("Ativar Aimbot", "Lock no player", function(state)
+AimSection:NewToggle("Ativar Aimbot", "Mira automática", function(state)
     AimbotEnabled = state
 end)
 
@@ -58,7 +59,7 @@ AimSection:NewDropdown("Parte do Corpo", {"Head", "UpperTorso"}, function(option
 end)
 
 -------------------------------
--- 👀 ESP Tab
+-- 👀 ESP
 local EspTab = Window:NewTab("ESP")
 local EspSection = EspTab:NewSection("Visual")
 
@@ -94,7 +95,7 @@ EspSection:NewButton("Ativar ESP", "Mostra nome e vida dos players", function()
 end)
 
 -------------------------------
--- 🖥️ Botão de abrir/fechar menu
+-- 🖥️ Botão para Abrir/Fechar Menu
 local IconID = "103669232191033"
 local ToggleButton = Instance.new("ImageButton")
 ToggleButton.Parent = game.CoreGui
@@ -107,7 +108,7 @@ ToggleButton.MouseButton1Click:Connect(function()
 end)
 
 -------------------------------
--- 🧠 Função Aimbot
+-- 🎯 Função Aimbot
 local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
 
@@ -133,7 +134,7 @@ RS.RenderStepped:Connect(function()
 end)
 
 -------------------------------
--- 🕹️ Função Fly
+-- ✈️ Função Fly
 local Movement = {F=0,B=0,L=0,R=0,U=0,D=0}
 local Control = {F=0,B=0,L=0,R=0,U=0,D=0}
 local BodyGyro, BodyVelocity
