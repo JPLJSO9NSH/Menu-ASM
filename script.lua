@@ -1,194 +1,278 @@
--- Arthur S. M. - Universal Script
--- Script com ESP (Nome + Vida), Aimbot, Fly com controle de velocidade, e NoClip.
--- Botão personalizado para abrir/fechar o menu.
+-- Script Universal Roblox (Mobile/PC) - Fly, NoClip, ESP + Vida/Nome, Aimbot com menu na tela
+-- Pra usar: cole no executor (ex: Arceus X) e rode em qualquer jogo
 
--- 🧠 UI Library
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("Arthur S. M.", "Ocean")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
--- ⚙️ Variáveis
-local FlySpeed = 50
-local Flying = false
-local NoClip = false
+-- Estados
+local ESPEnabled = false
 local AimbotEnabled = false
-local AimPart = "Head"
+local FlyEnabled = false
+local NoClipEnabled = false
+local AimPart = "Head" -- "Head" ou "HumanoidRootPart"
 
--------------------------------
--- 📦 Menu Principal
-local Main = Window:NewTab("Main")
-local MainSection = Main:NewSection("Funções Principais")
+-- GUI
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "UniversalMenu"
 
--- ✈️ Fly
-MainSection:NewToggle("Fly", "Ativar Fly", function(state)
-    if state then
-        StartFly()
+local function CreateButton(name, pos, text)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Text = text
+    btn.Size = UDim2.new(0, 120, 0, 35)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Parent = ScreenGui
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextScaled = true
+    btn.BorderSizePixel = 0
+    return btn
+end
+
+-- ESP Folder
+local ESPFolder = Instance.new("Folder", game.CoreGui)
+ESPFolder.Name = "ESPFolder"
+
+-- Função para criar ESP em um jogador
+local function CreateESP(player)
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    if ESPFolder:FindFirstChild(player.Name) then return end
+
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Name = player.Name
+    Billboard.Adornee = player.Character.HumanoidRootPart
+    Billboard.Size = UDim2.new(0, 120, 0, 40)
+    Billboard.AlwaysOnTop = true
+    Billboard.Parent = ESPFolder
+
+    local NameLabel = Instance.new("TextLabel", Billboard)
+    NameLabel.Size = UDim2.new(1,0,0.5,0)
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.Text = player.Name
+    NameLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    NameLabel.TextStrokeTransparency = 0
+    NameLabel.Font = Enum.Font.SourceSansBold
+    NameLabel.TextScaled = true
+
+    local HealthLabel = Instance.new("TextLabel", Billboard)
+    HealthLabel.Size = UDim2.new(1,0,0.5,0)
+    HealthLabel.Position = UDim2.new(0,0,0.5,0)
+    HealthLabel.BackgroundTransparency = 1
+    HealthLabel.TextColor3 = Color3.fromRGB(0,255,0)
+    HealthLabel.TextStrokeTransparency = 0
+    HealthLabel.Font = Enum.Font.SourceSansBold
+    HealthLabel.TextScaled = true
+
+    -- Atualizar vida
+    coroutine.wrap(function()
+        while Billboard.Parent and player.Character and player.Character:FindFirstChild("Humanoid") do
+            local hp = player.Character.Humanoid.Health
+            local maxHp = player.Character.Humanoid.MaxHealth
+            HealthLabel.Text = string.format("HP: %.0f/%.0f", hp, maxHp)
+            wait(0.3)
+        end
+        if Billboard.Parent then Billboard:Destroy() end
+    end)()
+end
+
+local function RemoveESP(player)
+    local esp = ESPFolder:FindFirstChild(player.Name)
+    if esp then esp:Destroy() end
+end
+
+local function UpdateESP()
+    if ESPEnabled then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                CreateESP(player)
+            end
+        end
     else
-        StopFly()
+        ESPFolder:ClearAllChildren()
     end
-end)
+end
 
-MainSection:NewSlider("Velocidade Fly", "Ajuste a velocidade", 300, 10, function(s)
-    FlySpeed = s
-end)
-
--- 🚪 NoClip
-MainSection:NewToggle("NoClip", "Atravessar paredes", function(state)
-    NoClip = state
-    game:GetService("RunService").Stepped:Connect(function()
-        if NoClip then
-            for _, v in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = false
-                end
-            end
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        wait(1)
+        if ESPEnabled then
+            CreateESP(player)
         end
     end)
 end)
 
--------------------------------
--- 🎯 Aimbot
-local AimTab = Window:NewTab("Aimbot")
-local AimSection = AimTab:NewSection("Aimbot")
-
-AimSection:NewToggle("Ativar Aimbot", "Mira automática", function(state)
-    AimbotEnabled = state
+Players.PlayerRemoving:Connect(function(player)
+    RemoveESP(player)
 end)
 
-AimSection:NewDropdown("Parte do Corpo", {"Head", "UpperTorso"}, function(option)
-    AimPart = option
-end)
+-- Aimbot
+local function GetClosestTarget()
+    local closestPart = nil
+    local shortestDistance = math.huge
 
--------------------------------
--- 👀 ESP
-local EspTab = Window:NewTab("ESP")
-local EspSection = EspTab:NewSection("Visual")
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(AimPart) then
+            local part = player.Character[AimPart]
+            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                if dist < shortestDistance then
+                    shortestDistance = dist
+                    closestPart = part
+                end
+            end
+        end
+    end
 
-EspSection:NewButton("Ativar ESP", "Mostra nome e vida dos players", function()
-    for _, v in pairs(game.Players:GetPlayers()) do
-        if v ~= game.Players.LocalPlayer then
-            local Billboard = Instance.new("BillboardGui")
-            Billboard.Parent = v.Character:WaitForChild("Head")
-            Billboard.Size = UDim2.new(0,100,0,50)
-            Billboard.Adornee = v.Character.Head
-            Billboard.AlwaysOnTop = true
+    return closestPart
+end
 
-            local Name = Instance.new("TextLabel", Billboard)
-            Name.Text = v.Name
-            Name.Size = UDim2.new(1,0,0.5,0)
-            Name.BackgroundTransparency = 1
-            Name.TextColor3 = Color3.fromRGB(0,255,0)
-            Name.TextStrokeTransparency = 0
+-- Fly / NoClip Variables
+local bodyVelocity, bodyGyro
+local humanoid = nil
+local rootPart = nil
 
-            local Health = Instance.new("TextLabel", Billboard)
-            Health.Text = "Vida: "..math.floor(v.Character.Humanoid.Health)
-            Health.Size = UDim2.new(1,0,0.5,0)
-            Health.Position = UDim2.new(0,0,0.5,0)
-            Health.BackgroundTransparency = 1
-            Health.TextColor3 = Color3.fromRGB(255,0,0)
-            Health.TextStrokeTransparency = 0
+local function EnableFly()
+    if not LocalPlayer.Character then return end
+    humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart or not humanoid then return end
 
-            v.Character.Humanoid.HealthChanged:Connect(function()
-                Health.Text = "Vida: "..math.floor(v.Character.Humanoid.Health)
-            end)
+    bodyVelocity = Instance.new("BodyVelocity", rootPart)
+    bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+    bodyVelocity.Velocity = Vector3.new(0,0,0)
+
+    bodyGyro = Instance.new("BodyGyro", rootPart)
+    bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+    bodyGyro.CFrame = rootPart.CFrame
+end
+
+local function DisableFly()
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
+end
+
+-- NoClip
+local function SetNoClip(state)
+    if not LocalPlayer.Character then return end
+    for _, part in pairs(LocalPlayer.Character:GetChildren()) do
+        if part:IsA("BasePart") and part.CanCollide ~= (not state) then
+            part.CanCollide = not state
+        end
+    end
+end
+
+-- Movimentação Fly
+local moveVector = Vector3.new(0,0,0)
+UserInputService.InputBegan:Connect(function(input)
+    if FlyEnabled then
+        if input.KeyCode == Enum.KeyCode.W then
+            moveVector = Vector3.new(0,0,-1)
+        elseif input.KeyCode == Enum.KeyCode.S then
+            moveVector = Vector3.new(0,0,1)
+        elseif input.KeyCode == Enum.KeyCode.A then
+            moveVector = Vector3.new(-1,0,0)
+        elseif input.KeyCode == Enum.KeyCode.D then
+            moveVector = Vector3.new(1,0,0)
+        elseif input.KeyCode == Enum.KeyCode.Space then
+            moveVector = Vector3.new(0,1,0)
+        elseif input.KeyCode == Enum.KeyCode.LeftShift then
+            moveVector = Vector3.new(0,-1,0)
         end
     end
 end)
 
--------------------------------
--- 🖥️ Botão para Abrir/Fechar Menu
-local IconID = "103669232191033"
-local ToggleButton = Instance.new("ImageButton")
-ToggleButton.Parent = game.CoreGui
-ToggleButton.Size = UDim2.new(0, 50, 0, 50)
-ToggleButton.Position = UDim2.new(0, 20, 0.5, -25)
-ToggleButton.Image = "rbxthumb://type=Asset&id="..IconID.."&w=150&h=150"
-
-ToggleButton.MouseButton1Click:Connect(function()
-    Library:ToggleUI()
+UserInputService.InputEnded:Connect(function(input)
+    if FlyEnabled then
+        if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.LeftShift then
+            moveVector = Vector3.new(0,0,0)
+        end
+    end
 end)
 
--------------------------------
--- 🎯 Função Aimbot
-local UIS = game:GetService("UserInputService")
-local RS = game:GetService("RunService")
+RunService.RenderStepped:Connect(function()
+    if FlyEnabled and bodyVelocity and bodyGyro and rootPart then
+        local cameraCFrame = workspace.CurrentCamera.CFrame
+        local direction = (cameraCFrame.LookVector * moveVector.Z) + (cameraCFrame.RightVector * moveVector.X) + (Vector3.new(0,1,0) * moveVector.Y)
+        bodyVelocity.Velocity = direction * 50
+        bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+    end
+end)
 
-RS.RenderStepped:Connect(function()
+-- NoClip loop
+RunService.Stepped:Connect(function()
+    if NoClipEnabled and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- Aimbot loop
+RunService.RenderStepped:Connect(function()
     if AimbotEnabled then
-        local Closest = nil
-        local ClosestDistance = math.huge
-        for _,v in pairs(game.Players:GetPlayers()) do
-            if v ~= game.Players.LocalPlayer and v.Character and v.Character:FindFirstChild(AimPart) then
-                local Pos = workspace.CurrentCamera:WorldToViewportPoint(v.Character[AimPart].Position)
-                local Dist = (Vector2.new(Pos.X, Pos.Y) - UIS:GetMouseLocation()).Magnitude
-                if Dist < ClosestDistance then
-                    ClosestDistance = Dist
-                    Closest = v
-                end
-            end
-        end
-
-        if Closest and Closest.Character and Closest.Character:FindFirstChild(AimPart) then
-            workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, Closest.Character[AimPart].Position)
+        local target = GetClosestTarget()
+        if target then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
         end
     end
 end)
 
--------------------------------
--- ✈️ Função Fly
-local Movement = {F=0,B=0,L=0,R=0,U=0,D=0}
-local Control = {F=0,B=0,L=0,R=0,U=0,D=0}
-local BodyGyro, BodyVelocity
-local Root = game.Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+-- Botões menu
+local btnESP = CreateButton("btnESP", UDim2.new(0,10,0,10), "ESP: OFF")
+local btnAimbot = CreateButton("btnAimbot", UDim2.new(0,10,0,55), "Aimbot: OFF")
+local btnAimPart = CreateButton("btnAimPart", UDim2.new(0,10,0,100), "Aim: Head")
+local btnFly = CreateButton("btnFly", UDim2.new(0,10,0,145), "Fly: OFF")
+local btnNoClip = CreateButton("btnNoClip", UDim2.new(0,10,0,190), "NoClip: OFF")
 
-function StartFly()
-    Flying = true
-    BodyGyro = Instance.new("BodyGyro")
-    BodyGyro.P = 9e4
-    BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-    BodyGyro.CFrame = Root.CFrame
-    BodyGyro.Parent = Root
-
-    BodyVelocity = Instance.new("BodyVelocity")
-    BodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    BodyVelocity.Parent = Root
-
-    RunService = game:GetService("RunService")
-    RunService.RenderStepped:Connect(function()
-        if not Flying then return end
-        local Camera = workspace.CurrentCamera
-        BodyGyro.CFrame = Camera.CFrame
-
-        Control.F = (Movement.F + Movement.B) * FlySpeed
-        Control.R = (Movement.L + Movement.R) * FlySpeed
-        Control.U = (Movement.U + Movement.D) * FlySpeed
-
-        BodyVelocity.Velocity = ((Camera.CFrame.LookVector * Control.F) +
-                                 (Camera.CFrame.RightVector * Control.R) +
-                                 (Camera.CFrame.UpVector * Control.U))
-    end)
-end
-
-function StopFly()
-    Flying = false
-    if BodyGyro then BodyGyro:Destroy() end
-    if BodyVelocity then BodyVelocity:Destroy() end
-end
-
-UIS.InputBegan:Connect(function(Input)
-    if Input.KeyCode == Enum.KeyCode.W then Movement.F = 1 end
-    if Input.KeyCode == Enum.KeyCode.S then Movement.B = -1 end
-    if Input.KeyCode == Enum.KeyCode.A then Movement.L = -1 end
-    if Input.KeyCode == Enum.KeyCode.D then Movement.R = 1 end
-    if Input.KeyCode == Enum.KeyCode.Space then Movement.U = 1 end
-    if Input.KeyCode == Enum.KeyCode.LeftControl then Movement.D = -1 end
+btnESP.MouseButton1Click:Connect(function()
+    ESPEnabled = not ESPEnabled
+    UpdateESP()
+    btnESP.Text = ESPEnabled and "ESP: ON" or "ESP: OFF"
 end)
 
-UIS.InputEnded:Connect(function(Input)
-    if Input.KeyCode == Enum.KeyCode.W then Movement.F = 0 end
-    if Input.KeyCode == Enum.KeyCode.S then Movement.B = 0 end
-    if Input.KeyCode == Enum.KeyCode.A then Movement.L = 0 end
-    if Input.KeyCode == Enum.KeyCode.D then Movement.R = 0 end
-    if Input.KeyCode == Enum.KeyCode.Space then Movement.U = 0 end
-    if Input.KeyCode == Enum.KeyCode.LeftControl then Movement.D = 0 end
+btnAimbot.MouseButton1Click:Connect(function()
+    AimbotEnabled = not AimbotEnabled
+    btnAimbot.Text = AimbotEnabled and "Aimbot: ON" or "Aimbot: OFF"
 end)
+
+btnAimPart.MouseButton1Click:Connect(function()
+    if AimPart == "Head" then
+        AimPart = "HumanoidRootPart"
+        btnAimPart.Text = "Aim: Chest"
+    else
+        AimPart = "Head"
+        btnAimPart.Text = "Aim: Head"
+    end
+end)
+
+btnFly.MouseButton1Click:Connect(function()
+    FlyEnabled = not FlyEnabled
+    if FlyEnabled then
+        EnableFly()
+        btnFly.Text = "Fly: ON"
+    else
+        DisableFly()
+        btnFly.Text = "Fly: OFF"
+    end
+end)
+
+btnNoClip.MouseButton1Click:Connect(function()
+    NoClipEnabled = not NoClipEnabled
+    SetNoClip(NoClipEnabled)
+    btnNoClip.Text = NoClipEnabled and "NoClip: ON" or "NoClip: OFF"
+end)
+
+print("Menu Script carregado! Use os botões no canto superior esquerdo para ativar/desativar as funções.")
